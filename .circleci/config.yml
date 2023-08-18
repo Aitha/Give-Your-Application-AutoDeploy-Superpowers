@@ -75,7 +75,7 @@ jobs:
           working_directory: ./frontend
           command: |
             npm i
-            npm audit --audit-level=critical
+            npm audit fix --audit-level=critical
 
   scan-backend:
     docker:
@@ -89,7 +89,7 @@ jobs:
           working_directory: ./backend
           command: |
             npm i
-            npm audit --audit-level=critical
+            npm audit fix --audit-level=critical
 workflows:
   default:
     jobs:
