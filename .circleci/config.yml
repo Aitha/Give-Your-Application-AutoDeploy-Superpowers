@@ -146,7 +146,7 @@ jobs:
           root: ~/
           paths:
             - project/.circleci/ansible/inventory.txt
-configure-infrastructure:
+  configure-infrastructure:
     docker:
       - image: cimg/base:stable
     steps:
