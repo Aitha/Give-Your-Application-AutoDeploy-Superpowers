@@ -1,281 +1,167 @@
 version: 2.1
 
-executors:
-  node:
-    docker:
-      - image: circleci/node:13.8.0
-  python:
-    docker:
-      - image: python:3.10-alpine3.16
-  aws:
-    docker:
-      - image: amazon/aws-cli
-
 commands:
-  destroy_environment:
-    description: Destroy Cloud Formation Stacks and infrastructure
+  install_awscli:
+    description: Install AWS CLI v2
+    steps:
+      - run:
+          name: Install AWS CLI v2
+          command: |
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            sudo ./aws/install
+  destroy-environment:
+    description: Destroy back-end and front-end cloudformation stacks given a workflow ID.
     parameters:
-      when:
+      Workflow_ID:
         type: string
-      id:
-        type: string
+        default: ${CIRCLE_WORKFLOW_ID:0:7}
     steps:
       - run:
-          name: Destroy udapeople backend cfn stack
+          name: Destroy environments
+          when: on_fail
           command: |
-            aws cloudformation delete-stack --stack-name udapeople-backend-<< parameters.id >>
-          environment:
-            TERM: xterm-256color
-          when: << parameters.when >>
-      - run:
-          name: Destroy udapeople frontend cfn stack and S3 bucket
-          command: |
-            aws s3 rm s3://udapeople-<< parameters.id >> --recursive
-            aws cloudformation delete-stack --stack-name udapeople-frontend-<< parameters.id >>
-          environment:
-              TERM: xterm-256color
-          when: << parameters.when >>
+            aws cloudformation delete-stack --stack-name udapeople-backend-<< parameters.Workflow_ID >>
+            aws s3 rm s3://udapeople-<<parameters.Workflow_ID>> --recursive
+            aws cloudformation delete-stack --stack-name udapeople-frontend-<< parameters.Workflow_ID >>
 jobs:
-
-  install-backend-dependencies:
-    executor: node
-    steps:
-      - checkout
-      - run:
-          name: npm install
-          working_directory: ./backend
-          command: ls -la && npm install
-      - persist_to_workspace:
-          root: .
-          paths:
-            - backend/node_modules
-
-
-  install-frontend-dependencies:
-   executor: node
-   steps:
-      - checkout
-      - run:
-          name: npm install
-          working_directory: ./frontend
-          command: ls -la && npm install
-      - persist_to_workspace:
-          root: .
-          paths:
-            - frontend/node_modules
-
-
-  build-backend:
-    executor: node
-    steps:
-      - checkout
-      - attach_workspace:
-          at: .
-      - run:
-          name: npm run build
-          working_directory: ./backend
-          command: npm run build
-      - persist_to_workspace:
-          root: .
-          paths:
-            - backend/dist
-
-
   build-frontend:
-    executor: node
+    docker:
+      - image: cimg/node:13.8.0
     steps:
       - checkout
-      - attach_workspace:
-          at: .
+      - restore_cache:
+          keys: [frontend-deps]
       - run:
-          name: npm run build
-          working_directory: ./frontend
-          command: npm run build
-
-
+          name: Build front-end
+          command: |
+            cd frontend
+            npm install
+            npm run build
+      - save_cache:
+          paths: [frontend/node_modules]
+          key: frontend-deps
+  build-backend:
+    docker:
+      - image: cimg/node:13.8.0
+    steps:
+      - checkout
+      - restore_cache:
+          keys: [backend-deps]
+      - run:
+          name: Back-end build
+          command: |
+            cd backend
+            npm install
+            npm run build
+      - save_cache:
+          paths: [backend/node_modules]
+          key: backend-deps
   test-frontend:
-    executor: node
+    docker:
+      - image: cimg/node:13.8.0
     steps:
       - checkout
-      - attach_workspace:
-          at: .
+      - restore_cache:
+          keys: [frontend-deps]
       - run:
-          name: Install junit coverage reporter
-          working_directory: ./frontend
-          command: npm install --save-dev jest-junit
-      - run:
-          name: Run tests with JUnit as reporter
-          working_directory: ./frontend
-          command: npm test -- --ci --runInBand --reporters=default --reporters=jest-junit && pwd && ls -la /tmp
-          environment:
-            JEST_JUNIT_OUTPUT_DIR: ./test_results
-      - store_test_results:
-          path: ./frontend/test_results
-      - store_artifacts:
-          path: ./frontend/test_results
-
-
+          name: Front-end Unit Test
+          command: |
+            cd frontend
+            npm install
+            npm test
   test-backend:
-    executor: node
+    docker:
+      - image: cimg/node:13.8.0
     steps:
       - checkout
-      - attach_workspace:
-          at: .
+      - restore_cache:
+          keys: [backend-deps]
       - run:
-          name: Install junit coverage reporter
-          working_directory: ./backend
-          command: npm install --save-dev jest-junit
-      - run:
-          name: Run tests with JUnit as reporter
-          working_directory: ./backend
-          command: npm test -- --ci --runInBand --reporters=default --reporters=jest-junit && pwd
-          environment:
-            JEST_JUNIT_OUTPUT_DIR: ./test_results
-      - store_test_results:
-          path: ./backend/test_results
-      - store_artifacts:
-          path: ./backend/test_results
-
-
+          name: Back-end Unit Test
+          command: |
+            cd backend
+            npm install
+            npm test
   scan-frontend:
-    executor: node
+    docker:
+      - image: cimg/node:13.8.0
     steps:
       - checkout
-      - attach_workspace:
-          at: .
+      - restore_cache:
+          keys: [frontend-deps]
       - run:
-          name: Check Frontend against security vulnerabilities
-          working_directory: ./frontend
-          command: 
-            npm install 
+          name: Front-end Scan
+          command: |
+            cd frontend
+            npm install
             npm audit fix --force --audit-level=critical
-
-
+            npm audit --audit-level=critical
   scan-backend:
-    executor: node
+    docker:
+      - image: cimg/node:13.8.0
     steps:
       - checkout
-      - attach_workspace:
-          at: .
+      - restore_cache:
+          keys: [backend-deps]
       - run:
-          name: Check Backend against security vulnerabilities
-          working_directory: ./backend
-          command: 
-             npm install 
-             npm audit fix --force --audit-level=critical
-
-
+          name: Back-end Scan
+          command: |
+            cd backend
+            npm install
+            npm audit fix --force --audit-level=critical
+            npm audit fix --force --audit-level=critical
+            npm audit --audit-level=critical
   deploy-infrastructure:
-    executor: aws
+    docker:
+      - image: cimg/base:stable
     steps:
       - checkout
+      - install_awscli
       - run:
-          name: Install dependencies
-          command: yum install -y tar gzip
-      - run:
-          name: Deploy backend infrastructure
+          name: Ensure back-end infrastructure exists
           command: |
             aws cloudformation deploy \
               --template-file .circleci/files/backend.yml \
+              --tags project=udapeople \
               --stack-name "udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
-              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}" \
-              --tags project=udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
+              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"
       - run:
-          name: Save backend URL in memstash
-          command: |
-            BACKEND_IP=$(aws ec2 describe-instances \
-              --query 'Reservations[*].Instances[*].PublicIpAddress' \
-              --filters "Name=tag:project,Values=udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
-              --output text)
-            
-      - run:
-          name: Deploy frontend infrastructure
+          name: Ensure front-end infrastructure exist
           command: |
             aws cloudformation deploy \
               --template-file .circleci/files/frontend.yml \
+              --tags project=udapeople \
               --stack-name "udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}" \
-              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}" \
-              --tags project=udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}
+              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"
       - run:
-          name: Add backend ip to ansible inventory
+          name: Add back-end ip to ansible inventory
           command: |
-            export backend_url=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=backend-${CIRCLE_WORKFLOW_ID:0:7}" \
-            --query 'Reservations[*].Instances[*].PublicIpAddress' \
-            --output text)
-            export API_URL="http://${backend_url}:3030"
-            echo $backend_url >> .circleci/ansible/inventory.txt
+            BACKEND_PUBLIC_IP=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=backend-${CIRCLE_WORKFLOW_ID:0:7}" \
+              --query 'Reservations[*].Instances[*].PublicIpAddress' \
+              --output text)
+            echo $BACKEND_PUBLIC_IP >> .circleci/ansible/inventory.txt
             cat .circleci/ansible/inventory.txt
       - persist_to_workspace:
-          root: .
+          root: ~/
           paths:
-           - .circleci/ansible/inventory.txt 
-      - destroy_environment:
-          id: ${CIRCLE_WORKFLOW_ID:0:7}
-          when: on_fail
-
-
-  configure-infrastructure:
-    executor: python
+            - project/.circleci/ansible/inventory.txt
       
-    environment:
-          NODE_ENV: "local"
-          VERSION: "1"
-          ENVIRONMENT: "production"
-          TYPEORM_CONNECTION: $TYPEORM_CONNECTION
-          TYPEORM_HOST: $TYPEORM_HOST
-          TYPEORM_USERNAME: $TYPEORM_USERNAME
-          TYPEORM_PASSWORD: $TYPEORM_PASSWORD
-          TYPEORM_DATABASE: $TYPEORM_DATABASE
-          TYPEORM_PORT: $TYPEORM_PORT
-          TYPEORM_ENTITIES: $TYPEORM_ENTITIES
-    steps:
-      - checkout
-      - add_ssh_keys:
-          fingerprints:
-            - "9b:fb:1d:9b:d7:7d:1b:28:14:71:cd:18:d5:40:ba:c0"
-      - attach_workspace:
-          at: .
-      - run:
-          name: Install dependencies
-          command: |
-            apk add --update --no-cache tar gzip ansible aws-cli
-            apk add --update ansible
-            ansible --version
-      - run:
-          name: Configure server
-          working_directory: ./.circleci/ansible
-          command: |
-            cat inventory.txt
-            export ANSIBLE_HOST_KEY_CHECKING=False
-            ansible-playbook -i inventory.txt configure-server.yml
+      - destroy-environment
 workflows:
   default:
     jobs:
-      ## BUILD AND DEPLOY
-      - install-backend-dependencies
-      - install-frontend-dependencies
-
-      - build-backend:
-          requires:
-            - install-backend-dependencies
-      - build-frontend:
-          requires:
-            - install-frontend-dependencies
-      - test-backend:
-          requires:
-            - build-backend
+      - build-frontend
+      - build-backend
       - test-frontend:
-          requires:
-            -  build-frontend
+          requires: [build-frontend]
+      - test-backend:
+          requires: [build-backend]
       - scan-backend:
-          requires:
-            - build-backend
+          requires: [build-backend]
       - scan-frontend:
-          requires:
-            - build-frontend
+          requires: [build-frontend]
       - deploy-infrastructure:
-           requires: [test-frontend, test-backend, scan-frontend, scan-backend]
-      - configure-infrastructure:
-           requires:
-            - deploy-infrastructure
+          requires: [test-frontend, test-backend, scan-frontend, scan-backend]
+  
