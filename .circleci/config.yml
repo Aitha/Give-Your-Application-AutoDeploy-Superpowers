@@ -161,15 +161,19 @@ jobs:
       - checkout
       - add_ssh_keys:
           fingerprints: ["9b:fb:1d:9b:d7:7d:1b:28:14:71:cd:18:d5:40:ba:c0"]
-      - attach_workspace:
-          at: ~/
       - run:
           name: Install dependencies
           command: |
-            apk add --update ansible
-            apk add --update --no-cache python3 py3-pip
-            /usr/local/bin/python -m pip install --upgrade pip
-            pip install awscli
+            yum update
+            yum install -y tar gzip unzip
+            yum -y install http://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+            yum -y install ansible
+           # apk add --update ansible
+           # apk add --update --no-cache python3 py3-pip
+           # /usr/local/bin/python -m pip install --upgrade pip
+           # pip install awscli
+      - attach_workspace:
+          at: ~/
       - run:
           name: Configure server
           command: |
