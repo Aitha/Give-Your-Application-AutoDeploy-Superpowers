@@ -1,23 +1,28 @@
 version: 2.1
+
 commands:
   destroy-environment:
-    description: Destroy back-end and front-end cloudformation stacks given a workflow ID.  
+    description: Destroy back-end and front-end cloudformation stacks given a workflow ID.
+    parameters:
+      Workflow_ID:
+        type: string
+        default: ${CIRCLE_WORKFLOW_ID:0:7}
     steps:
       - run:
           name: Destroy environments
           when: on_fail
           command: |
-            aws s3 rm "s3://udapeople-${CIRCLE_WORKFLOW_ID:0:7}" --recursive
-            aws cloudformation delete-stack --stack-name udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
-            aws cloudformation delete-stack --stack-name udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}
+            aws cloudformation delete-stack --stack-name udapeople-backend-<< parameters.Workflow_ID >>
+            aws s3 rm s3://udapeople-<<parameters.Workflow_ID>> --recursive
+            aws cloudformation delete-stack --stack-name udapeople-frontend-<< parameters.Workflow_ID >>
 jobs:
   build-frontend:
     docker:
-      - image: circleci/node:13.8.0
+      - image: cimg/node:13.8.0
     steps:
       - checkout
       - restore_cache:
-          keys: [frontend-build]
+          keys: [frontend-deps]
       - run:
           name: Build front-end
           command: |
@@ -26,14 +31,14 @@ jobs:
             npm run build
       - save_cache:
           paths: [frontend/node_modules]
-          key: frontend-build
+          key: frontend-deps
   build-backend:
     docker:
-      - image: circleci/node:13.8.0
+      - image: cimg/node:13.8.0
     steps:
       - checkout
       - restore_cache:
-          keys: [backend-build]
+          keys: [backend-deps]
       - run:
           name: Back-end build
           command: |
@@ -42,144 +47,158 @@ jobs:
             npm run build
       - save_cache:
           paths: [backend/node_modules]
-          key: backend-build
+          key: backend-deps
   test-frontend:
     docker:
-      - image: circleci/node:13.8.0
+      - image: cimg/node:13.8.0
     steps:
       - checkout
       - restore_cache:
-          keys: [frontend-test]
+          keys: [frontend-deps]
       - run:
-          name: Test front-end
+          name: Front-end Unit Test
           command: |
             cd frontend
             npm install
-            npm run test
-      - save_cache:
-          paths: [frontend/node_modules]
-          key: frontend-test
+            npm test
   test-backend:
     docker:
-      - image: circleci/node:13.8.0
+      - image: cimg/node:13.8.0
     steps:
       - checkout
       - restore_cache:
-          keys: [backend-test]
+          keys: [backend-deps]
       - run:
-          name: Back-end test
+          name: Back-end Unit Test
           command: |
             cd backend
             npm install
-            npm run test
-      - save_cache:
-          paths: [backend/node_modules]
-          key: backend-test
+            npm test
   scan-frontend:
     docker:
-      - image: circleci/node:13.8.0
+      - image: cimg/node:13.8.0
     steps:
       - checkout
       - restore_cache:
-          keys: [scan-frontend]
+          keys: [frontend-deps]
       - run:
-          name: Scan front-end
+          name: Front-end Scan
           command: |
             cd frontend
             npm install
-            npm audit fix --audit-level=critical --force
-      - save_cache:
-          paths: [frontend/node_modules]
-          key: frontend-scan
+            npm audit fix --force --audit-level=critical
+            npm audit --audit-level=critical
   scan-backend:
     docker:
-      - image: circleci/node:13.8.0
+      - image: cimg/node:13.8.0
     steps:
       - checkout
       - restore_cache:
-          keys: [scan-backend]
+          keys: [backend-deps]
       - run:
-          name: Scan back-end
+          name: Back-end Scan
           command: |
             cd backend
             npm install
-            npm audit fix --audit-level=critical --force
-      - save_cache:
-          paths: [backend/node_modules]
-          key: backend-scan
+            npm audit fix --force --audit-level=critical
+            npm audit fix --force --audit-level=critical
+            npm audit --audit-level=critical
   deploy-infrastructure:
     docker:
-      - image: amazon/aws-cli
+      - image: cimg/base:stable
     steps:
       - checkout
-      - run: yum install -y tar gzip
+      - install_awscli
       - run:
           name: Ensure back-end infrastructure exists
           command: |
             aws cloudformation deploy \
               --template-file .circleci/files/backend.yml \
-              --tags project=Udapeople \
+              --tags project=udapeople \
               --stack-name "udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
-              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"  
+              --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"
       - run:
           name: Ensure front-end infrastructure exist
           command: |
             aws cloudformation deploy \
               --template-file .circleci/files/frontend.yml \
-              --tags project=Udapeople \
+              --tags project=udapeople \
               --stack-name "udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}" \
               --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"
       - run:
           name: Add back-end ip to ansible inventory
           command: |
-            echo -e "[web]" >> .circleci/ansible/inventory.txt
-            aws ec2 describe-instances \
-              --query 'Reservations[*].Instances[*].PublicIpAddress' \
+            BACKEND_PUBLIC_IP=$(aws ec2 describe-instances \
               --filters "Name=tag:Name,Values=backend-${CIRCLE_WORKFLOW_ID:0:7}" \
-              --output text >> .circleci/ansible/inventory.txt
-              cat .circleci/ansible/inventory.txt
+              --query 'Reservations[*].Instances[*].PublicIpAddress' \
+              --output text)
+            echo $BACKEND_PUBLIC_IP >> .circleci/ansible/inventory.txt
+            cat .circleci/ansible/inventory.txt
       - persist_to_workspace:
           root: ~/
           paths:
             - project/.circleci/ansible/inventory.txt
+      
       - destroy-environment
-  configure-infrastructure:
+
+ configure-infrastructure:
     docker:
-       - image: python:3.7-alpine3.11
-#       - image: amazon/aws-cli
+      # Docker image here that supports Ansible
+      - image: python:3.7-alpine3.11
+#      - image: python:3.8-alpine3.15      
     steps:
-      - checkout
+      # Checkout code from git
+      - checkout       
+      # Add ssh keys with fingerprint
       - add_ssh_keys:
           fingerprints: ["9b:fb:1d:9b:d7:7d:1b:28:14:71:cd:18:d5:40:ba:c0"]
+      # attach workspace
+      - attach_workspace:
+          at: ~/
+
       - run:
           name: Install dependencies
           command: |
-            apk add --update ansible
-            apk add curl
-            apk add openssh-client
-            pip install awscli
-      - attach_workspace:
-          at: ~/
+              apk add --update tar gzip ansible
+              pip install awscli
+#              pip install --upgrade pip
+#              pip install ansible
+#              pip install awscli
+#            apk update && apk add --no-cache musl-dev libffi-dev openssl-dev make gcc python py2-pip python-dev
+#            pip install --upgrade pip
+#            pip install cffi
       - run:
           name: Configure server
           command: |
+            cat ./.circleci/ansible/inventory.txt
+            export ANSIBLE_HOST_KEY_CHECKING=False
+            export RECORD_HOST_KEYS=False
+            export ANSIBLE_PARAMIKO_BANNER_TIMEOUT=30   
+            echo ENVIROMENT=production > "backend/.env"      
+            echo TYPEORM_CONNECTION=postgres >> "backend/.env"
+            echo TYPEORM_MIGRATIONS_DIR=./src/migrations >> "backend/.env"
+            echo TYPEORM_ENTITIES=./src/modules/domain/**/*.entity.ts >> "backend/.env"          
+            echo TYPEORM_PORT=$TYPEORM_PORT >> "backend/.env"      
+            echo TYPEORM_USERNAME=$TYPEORM_USERNAME >> "backend/.env"            
+            echo TYPEORM_PASSWORD=$TYPEORM_PASSWORD >> "backend/.env"      
+            echo TYPEORM_DATABASE=$TYPEORM_DATABASE >> "backend/.env"     
+            echo "CONTENT OF backend/.env"      
+            cat backend/.env         
             cd .circleci/ansible
-            cat inventory.txt
-            ansible-playbook -i inventory.txt configure-server.yml
-      - destroy-environment
+            ansible-playbook -i inventory.txt configure-server.yml -v
 workflows:
-  Udaworkflow:
-    jobs: 
+  default:
+    jobs:
       - build-frontend
       - build-backend
       - test-frontend:
           requires: [build-frontend]
       - test-backend:
           requires: [build-backend]
+      - scan-backend:
+          requires: [build-backend]
       - scan-frontend:
           requires: [build-frontend]
-      - scan-backend:
-          requires: [build-backend] 
       - deploy-infrastructure:
           requires: [test-frontend, test-backend, scan-frontend, scan-backend]
       - configure-infrastructure:
