@@ -198,7 +198,7 @@ jobs:
           command: |
             cd ~/project/.circleci/ansible
             ansible-playbook -i inventory.txt configure-server.yml 
-      - destroy-environment
+
   run-migrations:
     docker:
       - image: circleci/node:13.8.0
@@ -224,7 +224,7 @@ jobs:
           name: Send migration results to kvdb.io
           command: |
             cat ~/project/backend/migrations_dump.txt 
-            if grep -q "has been executed successfully..." backend/migrations_dump.txt
+            if grep -q "has been executed successfully." backend/migrations_dump.txt
             then
                 curl https://kvdb.io/TsWKeDoRRTSm6zZDbu8LDV/migration_${CIRCLE_WORKFLOW_ID:0:7}  -d '1'
             fi
