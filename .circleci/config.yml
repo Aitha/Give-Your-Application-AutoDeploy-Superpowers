@@ -197,7 +197,8 @@ jobs:
           name: Configure server
           command: |
             cd ~/project/.circleci/ansible
-            ansible-playbook -i inventory.txt configure-server.yml     
+            ansible-playbook -i inventory.txt configure-server.yml 
+               
    run-migrations:
     docker:
       - image: circleci/node:13.8.0
