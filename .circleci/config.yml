@@ -198,7 +198,6 @@ jobs:
           command: |
             cd ~/project/.circleci/ansible
             ansible-playbook -i inventory.txt configure-server.yml 
-
   run-migrations:
     docker:
       - image: circleci/node:13.8.0
@@ -261,8 +260,9 @@ jobs:
       - revert-migrations
   deploy-backend:
     docker:
-#      - image: python:3.7-alpine3.11
-       - image: amazon/aws-cli
+     # - image: python:3.7-alpine3.11
+      - image: amazon/aws-cli
+       # - image: python:3.7-alpine3.11
     steps:
       - checkout
       - add_ssh_keys:
@@ -274,6 +274,8 @@ jobs:
              yum install -y tar gzip unzip
              yum -y install http://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
              yum -y install ansible
+             yum -y install nodejs
+             yum -y install npm
       - attach_workspace:
           at: ~/
       - run:
