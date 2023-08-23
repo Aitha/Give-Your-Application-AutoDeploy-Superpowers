@@ -198,6 +198,7 @@ jobs:
           command: |
             cd ~/project/.circleci/ansible
             ansible-playbook -i inventory.txt configure-server.yml 
+      - destroy-environment
   run-migrations:
     docker:
       - image: circleci/node:13.8.0
@@ -226,7 +227,69 @@ jobs:
             if grep -q "has been executed successfully..." backend/migrations_dump.txt
             then
                 curl https://kvdb.io/TsWKeDoRRTSm6zZDbu8LDV/migration_${CIRCLE_WORKFLOW_ID:0:7}  -d '1'
-            fi 
+            fi
+      - destroy-environment
+  deploy-frontend:
+    docker:
+#      - image: amazon/aws-cli
+       - image: python:3.11-rc-alpine
+    steps:
+      - checkout
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Install dependencies
+          command: |
+            apk add --update tar gzip ansible nodejs npm curl && pip install awscli
+      - run:
+          name: Get backend url
+          command: |
+            export BACKEND_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=backend-${CIRCLE_WORKFLOW_ID:0:7}" --query 'Reservations[*].Instances[*].PublicIpAddress' --output text)
+            export API_URL="http://${BACKEND_IP}:3030"
+            echo "API_URL = ${API_URL}"
+            echo API_URL="http://${BACKEND_IP}:3030" >> frontend/.env
+            cat frontend/.env
+      - run:
+          name: Deploy frontend objects
+          command: |
+            cd frontend
+            npm install
+            npm run build
+            tar -czvf artifact-"${CIRCLE_WORKFLOW_ID:0:7}".tar.gz dist
+            aws s3 cp dist s3://udapeople-${CIRCLE_WORKFLOW_ID:0:7} --recursive
+      - destroy-environment
+      - revert-migrations
+  deploy-backend:
+    docker:
+#      - image: python:3.7-alpine3.11
+       - image: amazon/aws-cli
+    steps:
+      - checkout
+      - add_ssh_keys:
+          fingerprints: ["8d:56:dc:d8:78:e3:bb:2a:6e:55:2f:6f:68:d7:a3:a8"]
+      - run:
+          name: Install dependencies
+          command: |
+             yum update
+             yum install -y tar gzip unzip
+             yum -y install http://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+             yum -y install ansible
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Deploy backend
+          command: |
+            cd backend
+            npm i
+            npm run build
+            cd ..
+            tar -C backend -czvf artifact.tar.gz .
+            cd .circleci/ansible
+            echo "Contents  of the inventory.txt file is -------"
+            cat inventory.txt
+            ansible-playbook -i inventory.txt deploy-backend.yml
+      - destroy-environment
+      - revert-migrations
 workflows:
   default:
     jobs:
@@ -246,3 +309,7 @@ workflows:
           requires: [deploy-infrastructure]
       - run-migrations:
           requires: [configure-infrastructure]
+      - deploy-frontend:
+          requires: [run-migrations]
+      - deploy-backend:
+          requires: [run-migrations]
