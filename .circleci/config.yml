@@ -275,10 +275,10 @@ jobs:
              # yum install -y tar gzip unzip
              # yum -y install http://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
              # yum -y install ansible
-            apk add --update ansible curl rsync openssh nodejs npm jq
-            ansible --version
-            pip install awscli
-            aws --version
+             apk add --update ansible curl rsync openssh nodejs npm jq
+             ansible --version
+             pip install awscli
+             aws --version
       - attach_workspace:
           at: ~/
       - run:
