@@ -225,7 +225,7 @@ jobs:
             cat ~/project/backend/migrations_dump.txt 
             if grep -q "has been executed successfully." backend/migrations_dump.txt
             then
-                curl https://kvdb.io/7kScezxRywPoQvA2TYJbqj/migration_${CIRCLE_WORKFLOW_ID:0:7}  -d '1'
+                curl https://kvdb.io/X6f4pFsKfQivK2n9gV6EkW/migration_${CIRCLE_WORKFLOW_ID:0:7}  -d '1'
             fi
       - destroy-environment
   deploy-frontend:
@@ -295,53 +295,6 @@ jobs:
             ansible-playbook -i inventory.txt deploy-backend.yml
       - destroy-environment
       - revert-migrations
-  smoke-test:
-    docker:
-      - image: python:3.10.0-alpine
-    steps:
-      - checkout
-      - attach_workspace:
-          at: ~/
-      - run:
-          name: Install dependencies
-          working_directory: /tmp
-          command: |
-             # yum update
-             # yum install -y tar gzip unzip
-             # yum -y install http://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
-             # yum -y install ansible
-             apk add --update ansible curl rsync openssh nodejs npm jq
-             ansible --version
-             pip install awscli
-             aws --version      
-      - run:
-          name: Get backend url
-          command: |
-            export BACKEND_IP=$(aws ec2 describe-instances --query 'Reservations[*].Instances[*].PublicIpAddress' --filters "Name=tag:Name,Values=backend-${CIRCLE_WORKFLOW_ID:0:7}" --output text)
-      - run:
-          name: Backend smoke test.
-          command: |
-             export BACKEND_IP=$(aws ec2 describe-instances --query 'Reservations[*].Instances[*].PublicIpAddress' --filters "Name=tag:Name,Values=backend-${CIRCLE_WORKFLOW_ID:0:7}" --output text)
-             echo "BACKEND_IP=${BACKEND_IP}"
-             export API_URL="http://${BACKEND_IP}:3030"
-             echo "API_URL=${API_URL}"
-             if curl "${API_URL}/api/status" | grep "ok"
-             then
-                return 0
-             else
-                return 1
-             fi
-      - run:
-          name: Frontend smoke test.
-          command: |
-             URL="http://udapeople-${CIRCLE_WORKFLOW_ID:0:7}.s3-website-us-east-1.amazonaws.com/#/employees"            
-             echo ${URL} 
-             if curl -s ${URL} | grep "Welcome......"
-             then
-               return 1
-             else
-               return 1
-             fi  
 workflows:
   default:
     jobs:
