@@ -179,7 +179,7 @@ jobs:
     steps:
       - checkout
       - add_ssh_keys:
-          fingerprints: ["8d:56:dc:d8:78:e3:bb:2a:6e:55:2f:6f:68:d7:a3:a8"]
+          fingerprints: ["dd:e8:89:98:71:32:c0:37:cb:9f:92:cc:06:d4:9e:25"]
       - run:
           name: Install dependencies
           command: |
@@ -266,7 +266,7 @@ jobs:
     steps:
       - checkout
       - add_ssh_keys:
-          fingerprints: ["01:35:74:7d:46:0b:69:39:1c:03:05:e2:ca:12:30:6f"]
+          fingerprints: ["dd:e8:89:98:71:32:c0:37:cb:9f:92:cc:06:d4:9e:25"]
       - run:
           name: Install dependencies
           working_directory: /tmp
@@ -389,26 +389,29 @@ jobs:
       - attach_workspace:
           at: ~/
       - run:
-          name: Get old stack workflow id and remove old stacks
+          name: Fetch the Old workflow ID
           command: |
             # your code here 
-            export OldWorkflowID=$(cat OldWorkflowID.txt)
-            export STACKS=($(aws cloudformation list-stacks \
-              --query "StackSummaries[*].StackName" \
-              --stack-status-filter CREATE_COMPLETE --no-paginate --output text))
-            echo OldWorkflowID= "${OldWorkflowID:10:17}"
-            echo CircleworkflowID= "${CIRCLE_WORKFLOW_ID:0:7}"
-            echo Stack names= "${STACKS}"
+            export OldWorkflowID=$(aws cloudformation \
+                      list-exports --query "Exports[?Name==\`WorkflowID\`].Value" \
+                      --no-paginate --output text)
+            echo OldWorkflowID: "${OldWorkflowID}"
+            echo CIRCLE_WORKFLOW_ID "${CIRCLE_WORKFLOW_ID:0:7}"
+            ## Fetch the stack names          
+            export STACKS=($(aws cloudformation list-stacks --query "StackSummaries[*].StackName" \
+                      --stack-status-filter CREATE_COMPLETE --no-paginate --output text)) 
+            echo Stack names: "${STACKS[@]}" 
+            echo udapeople-backend-${OldWorkflowID}
+            echo udapeople-frontend-${OldWorkflowID}
 
-            if [[ "${CIRCLE_WORKFLOW_ID:0:7}" != "${OldWorkflowID:10:17}" ]]
+            if [[ "${CIRCLE_WORKFLOW_ID:0:7}" != "${OldWorkflowID}" ]]
             then
-              echo "------------Delete Confirmed-------------------"
-              echo bucket= "s3://udapeople-${OldWorkflowID:10:17}"
-              aws s3 rm "s3://udapeople-${OldWorkflowID:10:17}" --recursive
-              aws cloudformation delete-stack --stack-name "udapeople-backend-${OldWorkflowID:10:17}"
-              aws cloudformation delete-stack --stack-name "udapeople-frontend-${OldWorkflowID:10:17}"
+              echo "------------deleting stacks-------------------"
+              aws s3 rm "s3://udapeople-${OldWorkflowID}" --recursive
+              aws cloudformation delete-stack --stack-name "udapeople-backend-${OldWorkflowID}"
+              aws cloudformation delete-stack --stack-name "udapeople-frontend-${OldWorkflowID}"
             else
-              echo "--------------Cannot Cleanup--------------------"
+              echo "--------------Nothing found to delete--------------------"
             fi
       #- destroy-environment
       #- revert-migrations
