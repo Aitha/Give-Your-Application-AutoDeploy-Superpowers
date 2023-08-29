@@ -27,7 +27,7 @@ commands:
           name: Revert migrations
           when: on_fail
           command: |
-            SUCCESS=$(curl --insecure https://kvdb.io/X6f4pFsKfQivK2n9gV6EkW/migration_${CIRCLE_WORKFLOW_ID:0:7})
+            SUCCESS=$(curl --insecure https://kvdb.io/BCBoZ2FkEYtunUKXXhoVCY/migration_${CIRCLE_WORKFLOW_ID:0:7})
             # Logic for reverting the database state
             if (( $SUCCESS == 1 ));
             then
@@ -225,7 +225,7 @@ jobs:
             cat ~/project/backend/migrations_dump.txt 
             if grep -q "has been executed successfully." backend/migrations_dump.txt
             then
-                curl https://kvdb.io/X6f4pFsKfQivK2n9gV6EkW/migration_${CIRCLE_WORKFLOW_ID:0:7}  -d '1'
+                curl https://kvdb.io/BCBoZ2FkEYtunUKXXhoVCY/migration_${CIRCLE_WORKFLOW_ID:0:7}  -d '1'
             fi
       - destroy-environment
   deploy-frontend:
@@ -401,14 +401,16 @@ jobs:
             export STACKS=($(aws cloudformation list-stacks --query "StackSummaries[*].StackName" \
                       --stack-status-filter CREATE_COMPLETE --no-paginate --output text)) 
             echo Stack names: "${STACKS[@]}" 
-            if [[ "${CIRCLE_WORKFLOW_ID:0:7}" == "${OldWorkflowID}" ]]
+            if [[ "${CIRCLE_WORKFLOW_ID:0:7}" != "${OldWorkflowID}" ]]
             then
-              echo "------------deleting stacks-------------------"
+              echo "deleting stacks..."
               aws s3 rm "s3://udapeople-${OldWorkflowID}" --recursive
               aws cloudformation delete-stack --stack-name "udapeople-backend-${OldWorkflowID}"
+              echo "udapeople-backend-${OldWorkflowID} deleted..."
               aws cloudformation delete-stack --stack-name "udapeople-frontend-${OldWorkflowID}"
+              echo "udapeople-frontend-${OldWorkflowID} deleted... "
             else
-              echo "--------------Nothing found to delete--------------------"
+              echo "Nothing to delete here..."
             fi
       #- destroy-environment
       #- revert-migrations
