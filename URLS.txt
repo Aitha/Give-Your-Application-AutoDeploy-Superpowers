@@ -1,0 +1,11 @@
+Provide a URL to your public GitHub repository. [URL01]
+https://github.com/Aitha/Give-Your-Application-AutoDeploy-Superpowers
+
+Provide the public URL for your S3 Bucket (aka, your front-end). [URL02]
+http://udapeople-82bb87d.s3-website-us-east-1.amazonaws.com
+
+URL03 - Cloudfront
+https://d2glrh0q5vc65n.cloudfront.net/
+
+URL04 - Healthy Backend 
+http://54.198.115.238:3030/api/status
