@@ -17,9 +17,9 @@ commands:
             aws s3 rm s3://udapeople-<<parameters.workflow_id>> --recursive
             aws cloudformation delete-stack --stack-name udapeople-frontend-<<parameters.workflow_id>>
   revert-migrations:
-    description: Revert the last migration
+    description: Revert the previous migration
     parameters:
-      Workflow_ID:
+      workflow_id:
         type: string
         default: ${CIRCLE_WORKFLOW_ID:0:7}
     steps:
@@ -27,14 +27,16 @@ commands:
           name: Revert migrations
           when: on_fail
           command: |
-            SUCCESS=$(curl --insecure https://kvdb.io/BCBoZ2FkEYtunUKXXhoVCY/migration_${CIRCLE_WORKFLOW_ID:0:7})
+            SUCCESS=$(curl --insecure https://kvdb.io/WrHe7dbmEAcCf67kRbQCpd/migration_<< parameters.workflow_id >>)
             # Logic for reverting the database state
             if (( $SUCCESS == 1 ));
             then
               cd ~/project/backend
               npm install
               npm run migration:revert
-            fi    
+            else
+                echo "No migrations to revert"
+            fi
 jobs:
   build-frontend:
     docker:
@@ -225,7 +227,7 @@ jobs:
             cat ~/project/backend/migrations_dump.txt 
             if grep -q "has been executed successfully." backend/migrations_dump.txt
             then
-                curl https://kvdb.io/BCBoZ2FkEYtunUKXXhoVCY/migration_${CIRCLE_WORKFLOW_ID:0:7}  -d '1'
+                curl https://kvdb.io/WrHe7dbmEAcCf67kRbQCpd/migration_${CIRCLE_WORKFLOW_ID:0:7}  -d '1'
             fi
       - destroy-environment
   deploy-frontend:
@@ -330,7 +332,8 @@ jobs:
             export FRONTEND_WEBSITE="http://udapeople-${CIRCLE_WORKFLOW_ID:0:7}.s3-website-us-east-1.amazonaws.com/#/employees"
             if curl -s ${FRONTEND_WEBSITE} | grep "Welcome"
             then
-              return 0
+           # change it to O to make it success
+              return 1
             else
               return 1
             fi
