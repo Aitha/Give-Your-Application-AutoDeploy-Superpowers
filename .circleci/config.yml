@@ -44,6 +44,7 @@ commands:
               exit 1
             else
               echo "No migrations found"
+            fi
 
   aws_cli_install:
     steps:
