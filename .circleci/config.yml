@@ -36,13 +36,14 @@ commands:
           command: |
             # Curl command here to see if there was a successful migration associated with the workflow id, store result in SUCCESS variable
             SUCCESS=$(curl --insecure https://kvdb.io/WrHe7dbmEAcCf67kRbQCpd/migration_${CIRCLE_WORKFLOW_ID:0:7})
-            if(( $SUCCESS==1 )); 
+            if [[ "${SUCCESS}" == "1" ]]
             then
               cd ~/project/backend
               npm install
               npm run migrations:revert
               exit 1
-            fi
+            else
+              echo "No migrations found"
 
   aws_cli_install:
     steps:
@@ -443,8 +444,7 @@ jobs:
             echo ${URL} 
             if curl -s ${URL} | grep "Welcome"
             then
-              # Change this to 0 after the job fails
-              return 0
+              return 1
             else
               return 1
             fi
