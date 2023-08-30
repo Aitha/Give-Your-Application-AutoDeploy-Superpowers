@@ -344,8 +344,8 @@ jobs:
             else
               return 1
             fi
-      - destroy-environment
       - revert-migrations
+      - destroy-environment
   cloudfront-update:
     docker:
        - image: amazon/aws-cli
