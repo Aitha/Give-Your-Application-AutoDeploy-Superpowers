@@ -35,7 +35,7 @@ commands:
               npm install
               npm run migration:revert
             else
-                echo "No migrations to revert"
+                echo "No migrations to revert at this time"
             fi
 jobs:
   build-frontend:
