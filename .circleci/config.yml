@@ -2,20 +2,25 @@ version: 2.1
        # Author: Jayaram Aita
 commands:
   destroy-environment:
-    description: Destroy backend and frontend cloudformation stacks given a workflow ID.
+    description: Destroy back-end and front-end cloudformation stacks given a workflow ID.
     parameters:
-      workflow_id:
-        type: string
-        default: "${CIRCLE_WORKFLOW_ID:0:7}" 
+      # Add parameter here   
     steps:
+      - run:
+          name: Delete S3 content
+          when: on_fail
+          command: |
+            aws s3 rm s3://udapeople-${CIRCLE_WORKFLOW_ID:0:7} --recursive
+            # aws s3 rm s3://udapeople-${CIRCLE_WORKFLOW_ID:0:7} --force
+            # exit 0
+
       - run:
           name: Destroy environments
           when: on_fail
           command: |
-            echo "Destroying environment: <<parameters.workflow_id>> "
-            aws cloudformation delete-stack --stack-name udapeople-backend-<<parameters.workflow_id>>
-            aws s3 rm s3://udapeople-<<parameters.workflow_id>> --recursive
-            aws cloudformation delete-stack --stack-name udapeople-frontend-<<parameters.workflow_id>>
+            aws cloudformation delete-stack --stack-name udapeople-backendStack-${CIRCLE_WORKFLOW_ID:0:7}
+            aws cloudformation delete-stack --stack-name udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}
+            # exit 0
   revert-migrations:
     description: Revert the last migration
     parameters:
@@ -34,7 +39,7 @@ commands:
               cd ~/project/backend
               npm install
               npm run migration:revert
-              exit 0
+              exit 1
             else
                 echo "No migrations required"
              fi
@@ -438,7 +443,7 @@ jobs:
             echo ${URL} 
             if curl -s ${URL} | grep "Welcome"
             then
-              return 0
+              return 1
             else
               return 1
             fi
