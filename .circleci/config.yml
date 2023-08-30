@@ -29,7 +29,7 @@ commands:
           command: |
             SUCCESS=$(curl --insecure https://kvdb.io/WrHe7dbmEAcCf67kRbQCpd/migration_<<parameters.workflow_id>>)
             # Logic for reverting the database state
-            if [[ "${SUCCESS}" != "1" ]]
+            if [[ "${SUCCESS}" == "1" ]]
             then
               cd ~/project/backend
               npm install
@@ -340,7 +340,7 @@ jobs:
             export FRONTEND_WEBSITE="http://udapeople-${CIRCLE_WORKFLOW_ID:0:7}.s3-website-us-east-1.amazonaws.com/#/employees"
             if curl -s ${FRONTEND_WEBSITE} | grep "Welcome"
             then
-              return 1
+              return 0
             else
               return 1
             fi
