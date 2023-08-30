@@ -331,7 +331,7 @@ jobs:
             if curl -s ${FRONTEND_WEBSITE} | grep "Welcome"
             then
            # change it to O to make it success
-              return 1
+              return 0
             else
               return 1
             fi
